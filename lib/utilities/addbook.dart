@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'book.dart';
+import 'file_utils.dart';
 import 'image_utils.dart';
 
 class AddBook extends StatefulWidget {
@@ -15,6 +16,7 @@ class AddBook extends StatefulWidget {
 }
 
 class _AddBookState extends State<AddBook> {
+  Collection collection = Collection(name: "Test Collection", books: []);
   String _imagePaths = '';
   int rating = 0;
   final TextEditingController _nameController = TextEditingController();
@@ -22,6 +24,54 @@ class _AddBookState extends State<AddBook> {
   final TextEditingController _genresController = TextEditingController();
   final TextEditingController _reviewController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCollection();
+  }
+
+  Future<void> _loadCollection() async {
+    final storedCollection = await loadCollectionFromStorage();
+    if (!mounted || storedCollection == null) {
+      return;
+    }
+    setState(() {
+      collection = storedCollection;
+    });
+  }
+
+  Future<void> _addBookAndPersist() async {
+    String name = _nameController.text;
+    String author = _authorController.text;
+    String img = _imagePaths;
+    List<String> genres = _genresController.text
+        .split(',')
+        .map((s) => s.trim())
+        .toList();
+    String review = _reviewController.text;
+    int rating = this.rating;
+    String description = _descriptionController.text;
+
+    Book newBook = Book(
+      name: name,
+      author: author,
+      img: img,
+      genres: genres,
+      review: review,
+      description: description,
+      rating: rating,
+    );
+
+    collection.addBook(newBook);
+    await saveCollectionToStorage(collection);
+
+    _nameController.clear();
+    _authorController.clear();
+    _genresController.clear();
+    _reviewController.clear();
+    _descriptionController.clear();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,98 +114,81 @@ class _AddBookState extends State<AddBook> {
               ),
               const SizedBox(height: fieldSpacing),
               TextField(
-                keyboardType: TextInputType.multiline, // Enables the 'Enter' key on the keyboard
-                minLines: 1,                           // Minimum lines to show initially
-                maxLines: null,    
+                keyboardType: TextInputType
+                    .multiline, // Enables the 'Enter' key on the keyboard
+                minLines: 1, // Minimum lines to show initially
+                maxLines: null,
                 controller: _descriptionController,
                 decoration: const InputDecoration(labelText: 'Description'),
               ),
               const SizedBox(height: fieldSpacing),
-              Row(children: [
-                IconButton(
-                  icon: Icon(rating >= 1 ? Icons.star_rate : Icons.star_rate_outlined),
-                  onPressed: () {
-                    setState(() {
-                      rating = 1;
-                    });
-                  },
-                ),
-                IconButton(
-                  icon: Icon(rating >= 2 ? Icons.star_rate : Icons.star_rate_outlined),
-                  onPressed: () {
-                    setState(() {
-                      rating = 2;
-                    });
-                  },
-                ),
-                IconButton(
-                  icon: Icon(rating >= 3 ? Icons.star_rate : Icons.star_rate_outlined),
-                  onPressed: () {
-                    setState(() {
-                      rating = 3;
-                    });
-                  },
-                ),
-                IconButton(
-                  icon: Icon(rating >= 4 ? Icons.star_rate : Icons.star_rate_outlined),
-                  onPressed: () {
-                    setState(() {
-                      rating = 4;
-                    });
-                  },
-                ),
-                IconButton(
-                  icon: Icon(rating >= 5 ? Icons.star_rate : Icons.star_rate_outlined),
-                  onPressed: () {
-                    setState(() {
-                      rating = 5;
-                    });
-                  },
-                ),
-              ],),
+              Row(
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      rating >= 1 ? Icons.star_rate : Icons.star_rate_outlined,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        rating = 1;
+                      });
+                    },
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      rating >= 2 ? Icons.star_rate : Icons.star_rate_outlined,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        rating = 2;
+                      });
+                    },
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      rating >= 3 ? Icons.star_rate : Icons.star_rate_outlined,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        rating = 3;
+                      });
+                    },
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      rating >= 4 ? Icons.star_rate : Icons.star_rate_outlined,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        rating = 4;
+                      });
+                    },
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      rating >= 5 ? Icons.star_rate : Icons.star_rate_outlined,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        rating = 5;
+                      });
+                    },
+                  ),
+                ],
+              ),
               const SizedBox(height: fieldSpacing),
               TextField(
-                keyboardType: TextInputType.multiline, // Enables the 'Enter' key on the keyboard
-                minLines: 1,                           // Minimum lines to show initially
-                maxLines: null,    
+                keyboardType: TextInputType
+                    .multiline, // Enables the 'Enter' key on the keyboard
+                minLines: 1, // Minimum lines to show initially
+                maxLines: null,
                 controller: _reviewController,
                 decoration: const InputDecoration(labelText: 'Review'),
               ),
               const SizedBox(height: fieldSpacing),
               ElevatedButton(
-                onPressed: () {
-                  // Handle adding the book
-                  String name = _nameController.text;
-                  String author = _authorController.text;
-                  String img = _imagePaths;
-                  List<String> genres = _genresController.text
-                      .split(',')
-                      .map((s) => s.trim())
-                      .toList();
-                  String review = _reviewController.text;
-                  int rating = this.rating;
-                  String description = _descriptionController.text;
-
-                  // Create a new Book object and add it to your collection
-                  Book newBook = Book(
-                    name: name,
-                    author: author,
-                    img: img,
-                    genres: genres,
-                    review: review,
-                    description: description,
-                    rating: rating,
-                  );
-                  // Add the book to your data source here
-
-                  // Clear the text fields after adding
-                  _nameController.clear();
-                  _authorController.clear();
-                  _genresController.clear();
-                  _reviewController.clear();
-                  _descriptionController.clear();
-
-                  // Optionally, show a confirmation message or navigate back
+                onPressed: () async {
+                  await _addBookAndPersist();
                 },
                 child: const Text('Add Book'),
               ),

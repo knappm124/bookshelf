@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'api.dart';
 import 'book.dart';
 import 'file_utils.dart';
+import 'image_utils.dart';
 
 class IsbnScanner extends StatefulWidget {
   final Collection collection;
@@ -70,7 +71,7 @@ class IsbnScannerState extends State<IsbnScanner> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Cross-Platform ISBN Scanner')),
+      appBar: AppBar(title: const Text('ISBN Scanner')),
       body: Column(
         children: [
           // Camera View Window
@@ -134,7 +135,7 @@ class IsbnScannerState extends State<IsbnScanner> {
                 children: [
                   if (_coverUrl.isNotEmpty)
                     Image.network(
-                      _coverUrl,
+                      webSafeImageUrl(_coverUrl),
                       height: 80,
                       errorBuilder: (c, o, s) => const SizedBox(),
                     ),

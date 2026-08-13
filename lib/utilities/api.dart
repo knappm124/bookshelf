@@ -1,22 +1,14 @@
-import 'dart:io';
-
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 import '../secret.dart';
 import 'book.dart';
-import 'file_utils.dart';
 
 class IsbnApi {
   String uri = 'https://www.googleapis.com/books/v1/volumes';
 
   Future<Book> fetchdata(String query) async {
-    print('Fetching data for ISBN: $query');
-    print('Using API Key: ${Secrets.apiKey}');
-    final queryParameters = {
-      'q': 'isbn:$query',
-      'key': Secrets.apiKey,
-    };
+    final queryParameters = {'q': 'isbn:$query', 'key': Secrets.apiKey};
     final url = Uri.parse(uri).replace(queryParameters: queryParameters);
     final response = await http.get(url);
 
@@ -31,15 +23,16 @@ class IsbnApi {
       String imgUrl = data['items'][0]['volumeInfo']['imageLinks'] != null
           ? data['items'][0]['volumeInfo']['imageLinks']['thumbnail']
           : 'https://via.placeholder.com/150';
+      // Upgrade to https to avoid mixed-content/CORS fetch failures on web.
+      imgUrl = imgUrl.replaceFirst('http://', 'https://');
 
-      File? imageFile = await saveNetworkImage(imgUrl);
       return Book(
         isbn: query,
         name: title,
         author: author,
         description: description,
         genres: genres,
-        img: imageFile?.path,
+        img: imgUrl,
       );
     } else {
       print('Failed with status: ${response.statusCode}');

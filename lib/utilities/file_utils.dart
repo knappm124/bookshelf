@@ -1,9 +1,5 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:path_provider/path_provider.dart';
-import 'dart:io';
-import 'package:flutter/foundation.dart'; 
-import 'package:http/http.dart' as http;
 
 import 'book.dart';
 
@@ -71,31 +67,4 @@ Future<Collection?> loadCollectionFromStorage() async {
 Future<void> saveCollectionToStorage(Collection collection) async {
   final prefs = await SharedPreferences.getInstance();
   await prefs.setString(_collectionStorageKey, collectionToJson(collection));
-}
-
-Future<File?> saveNetworkImage(String imageUrl) async {
-  try {
-    // 1. Download image bytes
-    final response = await http.get(Uri.parse(imageUrl));
-    if (response.statusCode != 200) {
-      throw Exception('Failed to load image');
-    }
-
-    // 2. Get secure internal directory
-    final directory = await getApplicationDocumentsDirectory();
-    
-    // 3. Create unique file name
-    final String fileName = 'image_${DateTime.now().millisecondsSinceEpoch}.png';
-    final file = File('${directory.path}/$fileName');
-
-    // 4. Save bytes to file
-    await file.writeAsBytes(response.bodyBytes);
-    
-    debugPrint('Image saved to: ${file.path}');
-    return file;
-    
-  } catch (e) {
-    debugPrint('Error saving image: $e');
-    return null;
-  }
 }

@@ -256,7 +256,6 @@ class _EditableBookState extends State<EditableBook> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final images = _item.img;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Book Details')),
@@ -295,46 +294,20 @@ class _EditableBookState extends State<EditableBook> {
                             ),
                           ),
                         ),
-                        child: Wrap(
-                          alignment: WrapAlignment.spaceBetween,
-                          runSpacing: 16,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 520),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _item.name,
-                                    style: theme.textTheme.headlineSmall
-                                        ?.copyWith(fontWeight: FontWeight.w800),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    _item.author,
-                                    style: theme.textTheme.bodyLarge?.copyWith(
-                                      color: colorScheme.onSurface,
-                                    ),
-                                  ),
-                                ],
+                            Text(
+                              _item.name,
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 10,
-                              ),
-                              decoration: BoxDecoration(
-                                color: colorScheme.surface.withValues(
-                                  alpha: 0.72,
-                                ),
-                                borderRadius: BorderRadius.circular(18),
-                              ),
-                              child: Text(
-                                images.length > 1
-                                    ? '${images.length} photos saved'
-                                    : 'Single photo view',
-                                style: theme.textTheme.labelLarge,
+                            const SizedBox(height: 8),
+                            Text(
+                              _item.author,
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                color: colorScheme.onSurface,
                               ),
                             ),
                           ],
@@ -397,26 +370,6 @@ class _EditableBookState extends State<EditableBook> {
                                         ),
                                       ),
                                     ),
-                                    if (images.length > 1) ...[
-                                      const SizedBox(height: 16),
-                                      Text(
-                                        'Gallery',
-                                        style: theme.textTheme.titleMedium
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w800,
-                                            ),
-                                      ),
-                                      const SizedBox(height: 10),
-                                      SizedBox(
-                                        height: 92,
-                                        child: buildInventoryImage(
-                                          source: _item.img,
-                                          width: double.infinity,
-                                          height: 92,
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
-                                    ],
                                   ],
                                 ),
                               ),

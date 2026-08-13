@@ -10,6 +10,16 @@ bool isDataImageUri(String source) {
   return source.startsWith('data:image/');
 }
 
+/// Routes remote images through a CORS-friendly proxy on web, since the
+/// CanvasKit renderer needs CORS headers to decode fetched image bytes and
+/// hosts like books.google.com don't send them.
+String webSafeImageUrl(String url) {
+  if (!kIsWeb) {
+    return url;
+  }
+  return 'https://wsrv.nl/?url=${Uri.encodeComponent(url)}';
+}
+
 String inferImageMimeType({String? mimeType, String? path}) {
   if (mimeType != null && mimeType.startsWith('image/')) {
     return mimeType;
@@ -104,7 +114,7 @@ Widget buildInventoryImage({
       uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
   if (isRemote) {
     return Image.network(
-      source,
+      webSafeImageUrl(source),
       width: width,
       height: height,
       fit: fit,

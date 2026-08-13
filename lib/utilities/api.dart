@@ -1,17 +1,21 @@
+import 'dart:io';
+
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
+import '../secret.dart';
 import 'book.dart';
+import 'file_utils.dart';
 
 class IsbnApi {
   String uri = 'https://www.googleapis.com/books/v1/volumes';
-  String apiKey = 'AIzaSyCAhY6FzYdSuZuZLl7vttdMv_p7TmK7pD8';
 
-  Future<Book> fetchdata() async {
-  
+  Future<Book> fetchdata(String query) async {
+    print('Fetching data for ISBN: $query');
+    print('Using API Key: ${Secrets.apiKey}');
     final queryParameters = {
-      'q': 'isbn:9781496755544',
-      'key': apiKey,
+      'q': 'isbn:$query',
+      'key': Secrets.apiKey,
     };
     final url = Uri.parse(uri).replace(queryParameters: queryParameters);
     final response = await http.get(url);
@@ -27,7 +31,16 @@ class IsbnApi {
       String imgUrl = data['items'][0]['volumeInfo']['imageLinks'] != null
           ? data['items'][0]['volumeInfo']['imageLinks']['thumbnail']
           : 'https://via.placeholder.com/150';
-      return Book(isbn: 9781496755544, name: title, author: author, description: description, genres: genres, img: imgUrl);
+
+      File? imageFile = await saveNetworkImage(imgUrl);
+      return Book(
+        isbn: query,
+        name: title,
+        author: author,
+        description: description,
+        genres: genres,
+        img: imageFile?.path,
+      );
     } else {
       print('Failed with status: ${response.statusCode}');
       throw Exception('Failed to load book data');

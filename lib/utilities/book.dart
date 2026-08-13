@@ -2,7 +2,7 @@ import 'package:uuid/uuid.dart';
 
 class Collection {
   static final Uuid _uuid = Uuid();
-  String _id;
+  final String _id;
   String _name;
   List<Book> _books;
 
@@ -40,11 +40,11 @@ class Collection {
 
 class Book {
   static final Uuid _uuid = Uuid();
-  String _id;
+  final String _id;
   String _name;
   String _author;
   List<String> _genres;
-  int _isbn;
+  String _isbn;
   String _img;
   int _rating;
   String _review;
@@ -55,13 +55,13 @@ class Book {
     required this._name,
     required this._author,
     List<String>? genres,
-    int? isbn,
+    String? isbn,
     String? img,
     int? rating,
     String? review,
     String? description,
   }) : _id = id ?? Book._uuid.v4(),
-       _isbn = isbn ?? 0,
+       _isbn = isbn ?? '',
        _rating = rating ?? 0,
        _review = review ?? '',
        _img = img ?? '',
@@ -80,7 +80,7 @@ class Book {
     _genres = genres;
   }
 
-  set isbn(int isbn) {
+  set isbn(String isbn) {
     _isbn = isbn;
   }
 
@@ -104,7 +104,7 @@ class Book {
   String get name => _name;
   String get author => _author;
   List<String> get genres => _genres;
-  int get isbn => _isbn;
+  String get isbn => _isbn;
   String get img => _img;
   int get rating => _rating;
   String get review => _review;

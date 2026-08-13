@@ -2,6 +2,7 @@ import 'utilities/addbook.dart';
 import 'utilities/book.dart';
 import 'utilities/file_utils.dart';
 import 'utilities/bookwidgets.dart';
+import 'utilities/isbnscanner.dart';
 
 import 'dart:async';
 import 'dart:math' as math;
@@ -321,9 +322,41 @@ class _MainAppState extends State<MainApp> {
       return;
     }
 
+    final context = _navigatorKey.currentContext;
+    if (context == null) {
+      return;
+    }
+
+    final choice = await showModalBottomSheet<_AddBookMethod>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_note),
+              title: const Text('Enter Manually'),
+              onTap: () => Navigator.pop(context, _AddBookMethod.manual),
+            ),
+            ListTile(
+              leading: const Icon(Icons.qr_code_scanner),
+              title: const Text('Scan ISBN'),
+              onTap: () => Navigator.pop(context, _AddBookMethod.scan),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (choice == null) {
+      return;
+    }
+
     final result = await _navigatorKey.currentState?.push<Book>(
       MaterialPageRoute(
-        builder: (context) => AddBook(collection: _collections!),
+        builder: (context) => choice == _AddBookMethod.manual
+            ? AddBook(collection: _collections!)
+            : IsbnScanner(collection: _collections!),
       ),
     );
 
@@ -332,6 +365,8 @@ class _MainAppState extends State<MainApp> {
     }
   }
 }
+
+enum _AddBookMethod { manual, scan }
 
 class Scroll extends StatefulWidget {
   final Collection collections;
@@ -672,7 +707,7 @@ class _ScrollState extends State<Scroll> {
                     duration: const Duration(milliseconds: 180),
                     child: ListView.builder(
                       key: ValueKey(
-                        '${booksToDisplay.length}-${_sortField.name}-${_sortAscending}-${_searchQuery.trim()}',
+                        '${booksToDisplay.length}-${_sortField.name}-$_sortAscending-${_searchQuery.trim()}',
                       ),
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),

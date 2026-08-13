@@ -1,7 +1,5 @@
 import 'utilities/addbook.dart';
-import 'utilities/api.dart';
 import 'utilities/book.dart';
-import 'utilities/menu.dart';
 import 'utilities/file_utils.dart';
 import 'utilities/bookwidgets.dart';
 
@@ -12,7 +10,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:logging/logging.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 ThemeData buildAppTheme() {
   final colorScheme = ColorScheme.fromSeed(
@@ -204,6 +201,7 @@ class _MainAppState extends State<MainApp> {
   Collection? _collections;
   List<Book>? _filteredBooks;
   String? _loadErrorMessage;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -213,18 +211,17 @@ class _MainAppState extends State<MainApp> {
 
   Future<void> _loadCollections() async {
     try {
-      final collection = loadCollectionFromStorage();
+      final loadedCollection = await loadCollectionFromStorage();
 
       if (!mounted) {
         return;
       }
 
-      final loadedCollection = await collection;
-
       setState(() {
         _loadErrorMessage = null;
-        _collections = loadedCollection;
-        ;
+        _collections =
+            loadedCollection ?? Collection(name: 'My Bookshelf', books: []);
+        _isLoading = false;
       });
     } catch (_) {
       if (!mounted) {
@@ -233,13 +230,14 @@ class _MainAppState extends State<MainApp> {
       setState(() {
         _collections = null;
         _loadErrorMessage = 'Failed to load inventory data.';
+        _isLoading = false;
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_collections == null) {
+    if (_isLoading) {
       return MaterialApp(
         theme: buildAppTheme(),
         home: Scaffold(
@@ -265,6 +263,30 @@ class _MainAppState extends State<MainApp> {
       );
     }
 
+    if (_loadErrorMessage != null && _collections == null) {
+      return MaterialApp(
+        theme: buildAppTheme(),
+        home: Scaffold(
+          appBar: AppBar(title: const Text('My Bookshelf')),
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_loadErrorMessage!),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: () {
+                    unawaited(_loadCollections());
+                  },
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return MaterialApp(
       theme: buildAppTheme(),
       navigatorKey: _navigatorKey,
@@ -276,16 +298,17 @@ class _MainAppState extends State<MainApp> {
         ),
         body: SafeArea(
           child: Scroll(
-            collections: _collections!,
+            collections:
+                _collections ?? Collection(name: 'My Bookshelf', books: []),
             filteredBooks: _filteredBooks,
             onAddPressed: () {
-              AddBook();
+              unawaited(_openNewBook());
             },
           ),
         ),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: () {
-            AddBook();
+            unawaited(_openNewBook());
           },
           icon: const Icon(Icons.add),
           label: const Text('Add Book'),
@@ -293,13 +316,27 @@ class _MainAppState extends State<MainApp> {
       ),
     );
   }
+  Future<void> _openNewBook() async {
+    if (_collections == null) {
+      return;
+    }
+
+    final result = await _navigatorKey.currentState?.push<Book>(
+      MaterialPageRoute(
+        builder: (context) => AddBook(collection: _collections!),
+      ),
+    );
+
+    if (!mounted || result == null) {
+      return;
+    }
+  }
 }
 
 class Scroll extends StatefulWidget {
   final Collection collections;
   final List<Book>? filteredBooks;
   final VoidCallback onAddPressed;
-
 
   const Scroll({
     super.key,
@@ -326,7 +363,7 @@ class _ScrollState extends State<Scroll> {
     _searchController.dispose();
     super.dispose();
   }
-  
+
   void _clearSearch() {
     _searchController.clear();
     setState(() {
@@ -410,136 +447,8 @@ class _ScrollState extends State<Scroll> {
     );
   }
 
-  Widget _buildOverviewCard({
-    required BuildContext context,
-    required int totalBooks,
-    required int visibleBooks,
-    required bool hasSearch,
-   
-  }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final viewportWidth = MediaQuery.sizeOf(context).width;
-    final isCompact = viewportWidth < 600;
-    final heroHeight = viewportWidth >= 760
-        ? 220.0
-        : (isCompact ? 188.0 : 216.0);
 
-    return Container(
-      width: double.infinity,
-      constraints: BoxConstraints(minHeight: heroHeight),
-      padding: EdgeInsets.all(isCompact ? 14 : 20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: LinearGradient(
-          colors: [
-            colorScheme.primaryContainer.withValues(alpha: 0.98),
-            colorScheme.surfaceContainerHigh,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.8),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.primary.withValues(alpha: 0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            top: isCompact ? -16 : -24,
-            right: isCompact ? -14 : -18,
-            child: IgnorePointer(
-              child: Container(
-                width: isCompact ? 96 : 140,
-                height: isCompact ? 96 : 140,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: colorScheme.primary.withValues(alpha: 0.10),
-                ),
-              ),
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isCompact ? 10 : 12,
-                      vertical: isCompact ? 6 : 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surface.withValues(alpha: 0.72),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.warehouse_outlined,
-                          size: isCompact ? 16 : 18,
-                          color: colorScheme.primary,
-                        ),
-                        const SizedBox(width: 8),
-                      ],
-                    ),
-                  ),
-                  if (hasSearch)
-                    _buildStatusPill(
-                      context,
-                      icon: Icons.search,
-                      label: 'Search active',
-                    ),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatusPill(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-  }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: colorScheme.surface.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: colorScheme.onSurfaceVariant),
-          const SizedBox(width: 8),
-          Text(label, style: theme.textTheme.labelMedium),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildControlPanel(
-    BuildContext context, {
-    required bool hasSearch,
-  }) {
+  Widget _buildControlPanel(BuildContext context, {required bool hasSearch}) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -568,7 +477,7 @@ class _ScrollState extends State<Scroll> {
                   decoration: InputDecoration(
                     labelText: 'Search bookshelf',
                     prefixIcon: const Icon(Icons.search),
-                    hintText: 'Search name or author',
+                    hintText: 'Search title or author',
                     border: const OutlineInputBorder(),
                     suffixIcon: hasSearch
                         ? IconButton(
@@ -618,7 +527,7 @@ class _ScrollState extends State<Scroll> {
     required int totalCount,
   }) {
     final theme = Theme.of(context);
-   
+
     return Row(
       children: [
         Expanded(
@@ -658,25 +567,10 @@ class _ScrollState extends State<Scroll> {
         padding: const EdgeInsets.only(bottom: 12),
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-            child: FocusTraversalOrder(
-              order: const NumericFocusOrder(1),
-              child: _buildOverviewCard(
-                context: context,
-                totalBooks: totalBooks,
-                visibleBooks: visibleCount,
-                hasSearch: hasSearch,
-              ),
-            ),
-          ),
-          Padding(
             padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
             child: FocusTraversalOrder(
               order: const NumericFocusOrder(2),
-              child: _buildControlPanel(
-                context,
-                hasSearch: hasSearch,
-              ),
+              child: _buildControlPanel(context, hasSearch: hasSearch),
             ),
           ),
           Container(
@@ -819,3 +713,4 @@ class _ScrollState extends State<Scroll> {
     );
   }
 }
+

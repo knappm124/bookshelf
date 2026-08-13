@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'editing.dart';
@@ -45,7 +47,7 @@ class BookIcons extends StatelessWidget {
               builder: (context) {
                 return AlertDialog(
                   title: const Text('Delete item?'),
-                  content: Text('Delete "${i.name}" from your inventory?'),
+                  content: Text('Delete "${i.name}" from your bookshelf?'),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(false),
@@ -91,6 +93,7 @@ class BookRow extends StatelessWidget {
   final Book i;
   final int index;
   final Collection collections;
+  static const double _maxCoverDimension = 200;
 
   const BookRow({
     super.key,
@@ -99,164 +102,122 @@ class BookRow extends StatelessWidget {
     required this.collections,
   });
 
+  Future<Size?> _resolveImageSize(String source) async {
+    if (source.trim().isEmpty) {
+      return null;
+    }
+
+    ImageProvider? provider;
+
+    if (isDataImageUri(source)) {
+      final bytes = decodeImageFromDataUri(source);
+      if (bytes == null || bytes.isEmpty) {
+        return null;
+      }
+      provider = MemoryImage(bytes);
+    } else {
+      final uri = Uri.tryParse(source);
+      final isRemote =
+          uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
+
+      if (isRemote) {
+        provider = NetworkImage(source);
+      } else {
+        return null;
+      }
+    }
+
+    final completer = Completer<Size?>();
+    final stream = provider.resolve(const ImageConfiguration());
+    late final ImageStreamListener listener;
+
+    listener = ImageStreamListener(
+      (ImageInfo imageInfo, bool synchronousCall) {
+        stream.removeListener(listener);
+        completer.complete(
+          Size(
+            imageInfo.image.width.toDouble(),
+            imageInfo.image.height.toDouble(),
+          ),
+        );
+      },
+      onError: (Object error, StackTrace? stackTrace) {
+        stream.removeListener(listener);
+        completer.complete(null);
+      },
+    );
+
+    stream.addListener(listener);
+    return completer.future.timeout(
+      const Duration(seconds: 5),
+      onTimeout: () {
+        stream.removeListener(listener);
+        return null;
+      },
+    );
+  }
+
+  Size _boundedSize(Size sourceSize) {
+    final scale = [
+      _maxCoverDimension / sourceSize.width,
+      _maxCoverDimension / sourceSize.height,
+      1.0,
+    ].reduce((a, b) => a < b ? a : b);
+
+    return Size(sourceSize.width * scale, sourceSize.height * scale);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    final defaultSize = const Size(96, 108);
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.05),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Semantics(
-        button: true,
-        label:
-            '${i.name}, author ${i.author},description ${i.description}, rating ${i.rating}, review ${i.review}',
-        hint: 'Open item details',
-        child: Material(
-          color: colorScheme.surface,
-          borderRadius: BorderRadius.circular(22),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(22),
-            canRequestFocus: true,
-            overlayColor: WidgetStateProperty.resolveWith((states) {
-              if (states.contains(WidgetState.focused)) {
-                return colorScheme.primary.withValues(alpha: 0.22);
-              }
-              if (states.contains(WidgetState.hovered)) {
-                return colorScheme.primary.withValues(alpha: 0.08);
-              }
-              return null;
-            }),
-            onTap: () async {
-              final result = await Navigator.push<bool>(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => EditableBook(
-                    i: i,
-                    collections: collections,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Semantics(
+          button: true,
+          label: '${i.name}, by author ${i.author}',
+          hint: 'Open item details',
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(18),
+              onTap: () async {
+                await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        EditableBook(i: i, collections: collections),
                   ),
-                ),
-              );
-            },
-            child: Ink(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: colorScheme.outlineVariant),
-                gradient: LinearGradient(
-                  colors: [
-                    colorScheme.surface,
-                    colorScheme.surfaceContainerLowest,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Stack(
-                      children: [
-                        Container(
-                          width: 96,
-                          height: 108,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(18),
-                            gradient: LinearGradient(
-                              colors: [
-                                colorScheme.primaryContainer.withValues(
-                                  alpha: 0.72,
-                                ),
-                                colorScheme.surfaceContainerHigh,
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(18),
-                            child: buildInventoryImage(
-                              source: i.img ?? '',
-                              width: 96,
-                              height: 108,
-                              fit: BoxFit.cover,
-                              semanticLabel: '${i.name} item image',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      i.name,
-                                      style: theme.textTheme.titleLarge
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w800,
-                                          ),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      i.author,
-                                      style: theme.textTheme.bodyMedium
-                                          ?.copyWith(
-                                            color: colorScheme.onSurface,
-                                          ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    'Rating: ${i.rating}',
-                                    style: theme.textTheme.titleMedium
-                                        ?.copyWith(fontWeight: FontWeight.w800),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Review: ${i.review}',
-                                    style: theme.textTheme.bodySmall,
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
+                );
+              },
+              child: FutureBuilder<Size?>(
+                future: _resolveImageSize(i.img),
+                builder: (context, snapshot) {
+                  final rawSize = snapshot.data ?? defaultSize;
+                  final size = _boundedSize(rawSize);
 
-                          Icon(
-                            Icons.arrow_forward_rounded,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ],
+                  return Container(
+                    width: size.width,
+                    height: size.height,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: colorScheme.outlineVariant),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: buildInventoryImage(
+                        source: i.img,
+                        width: size.width,
+                        height: size.height,
+                        fit: BoxFit.contain,
+                        semanticLabel: '${i.name} item image',
                       ),
                     ),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
           ),
@@ -270,11 +231,7 @@ class EditableBook extends StatefulWidget {
   final Book i;
   final Collection collections;
 
-  const EditableBook({
-    super.key,
-    required this.i,
-    required this.collections,
-  });
+  const EditableBook({super.key, required this.i, required this.collections});
 
   @override
   State<EditableBook> createState() => _EditableBookState();
@@ -522,11 +479,7 @@ class EditableBookHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        BookIcons(
-          i: i,
-          collections: collections,
-          onBookUpdated: onBookUpdated,
-        ),
+        BookIcons(i: i, collections: collections, onBookUpdated: onBookUpdated),
       ],
     );
   }

@@ -6,23 +6,25 @@ import 'book.dart';
 const String _collectionStorageKey = 'collection_json';
 
 Collection collectionFromJson(String json) {
-  Map<String, dynamic> collectionMap = jsonDecode(json);
-  String collectionName = collectionMap['name'];
-  String collectionId = collectionMap['id'];
+  final Map<String, dynamic> collectionMap = jsonDecode(json);
+  final String collectionName = collectionMap['name'] as String? ?? '';
+  final String collectionId = collectionMap['id'] as String? ?? '';
   List<Book> books = [];
-  if (collectionMap['books'] != null) {
-    for (var bookMap in collectionMap['books']) {
+  final rawBooks = collectionMap['books'];
+  if (rawBooks is List) {
+    for (final rawBook in rawBooks) {
+      final bookMap = rawBook as Map<String, dynamic>;
       books.add(
         Book(
-          id: bookMap['id'],
-          name: bookMap['name'],
-          author: bookMap['author'],
+          id: bookMap['id'] as String?,
+          name: bookMap['name'] as String? ?? '',
+          author: bookMap['author'] as String? ?? '',
           genres: List<String>.from(bookMap['genres'] ?? []),
-          isbn: bookMap['isbn'],
-          img: bookMap['img'],
-          rating: bookMap['rating'],
-          review: bookMap['review'],
-          description: bookMap['description'],
+          isbn: bookMap['isbn'] as int?,
+          img: bookMap['img'] as String?,
+          rating: bookMap['rating'] as int?,
+          review: bookMap['review'] as String?,
+          description: bookMap['description'] as String?,
         ),
       );
     }

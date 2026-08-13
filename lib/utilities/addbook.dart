@@ -9,14 +9,15 @@ import 'file_utils.dart';
 import 'image_utils.dart';
 
 class AddBook extends StatefulWidget {
-  const AddBook({super.key});
+  final Collection collection;
+
+  const AddBook({super.key, required this.collection});
 
   @override
   State<AddBook> createState() => _AddBookState();
 }
 
 class _AddBookState extends State<AddBook> {
-  Collection collection = Collection(name: "Test Collection", books: []);
   String _imagePaths = '';
   int rating = 0;
   final TextEditingController _nameController = TextEditingController();
@@ -24,22 +25,6 @@ class _AddBookState extends State<AddBook> {
   final TextEditingController _genresController = TextEditingController();
   final TextEditingController _reviewController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _loadCollection();
-  }
-
-  Future<void> _loadCollection() async {
-    final storedCollection = await loadCollectionFromStorage();
-    if (!mounted || storedCollection == null) {
-      return;
-    }
-    setState(() {
-      collection = storedCollection;
-    });
-  }
 
   Future<void> _addBookAndPersist() async {
     String name = _nameController.text;
@@ -63,8 +48,8 @@ class _AddBookState extends State<AddBook> {
       rating: rating,
     );
 
-    collection.addBook(newBook);
-    await saveCollectionToStorage(collection);
+    widget.collection.addBook(newBook);
+    await saveCollectionToStorage(widget.collection);
 
     _nameController.clear();
     _authorController.clear();

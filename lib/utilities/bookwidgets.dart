@@ -93,7 +93,7 @@ class BookRow extends StatelessWidget {
   final Book i;
   final int index;
   final Collection collections;
-  static const double _maxCoverDimension = 200;
+  static const double _maxCoverDimension = 150;
 
   const BookRow({
     super.key,
@@ -169,11 +169,10 @@ class BookRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final defaultSize = const Size(96, 108);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: EdgeInsets.zero,
       child: Align(
         alignment: Alignment.centerLeft,
         child: Semantics(
@@ -204,7 +203,6 @@ class BookRow extends StatelessWidget {
                     height: size.height,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: colorScheme.outlineVariant),
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(18),
@@ -379,6 +377,96 @@ class _EditableBookState extends State<EditableBook> {
                             width: isWide ? 16 : 0,
                             height: isWide ? 0 : 16,
                           ),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(28),
+                              gradient: LinearGradient(
+                                colors: [
+                                  colorScheme.primaryContainer.withValues(
+                                    alpha: 0.95,
+                                  ),
+                                  colorScheme.surfaceContainerHigh,
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              border: Border.all(
+                                color: colorScheme.outlineVariant.withValues(
+                                  alpha: 0.85,
+                                ),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Description',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  _item.description.isNotEmpty
+                                      ? _item.description
+                                      : 'No description available.',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Genres: ${_item.genres.isNotEmpty ? _item.genres.join(', ') : 'No genres available.'}',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      _item.rating > 0
+                                          ? Icons.star_rate
+                                          : Icons.star_rate_outlined,
+                                    ),
+                                    Icon(
+                                      _item.rating > 1
+                                          ? Icons.star_rate
+                                          : Icons.star_rate_outlined,
+                                    ),
+                                    Icon(
+                                      _item.rating > 2
+                                          ? Icons.star_rate
+                                          : Icons.star_rate_outlined,
+                                    ),
+                                    Icon(
+                                      _item.rating > 3
+                                          ? Icons.star_rate
+                                          : Icons.star_rate_outlined,
+                                    ),
+                                    Icon(
+                                      _item.rating > 4
+                                          ? Icons.star_rate
+                                          : Icons.star_rate_outlined,
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  _item.review.isNotEmpty
+                                      ? 'Review: ${_item.review}'
+                                      : 'No review available.',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 16, height: 16),
                           FocusTraversalOrder(
                             order: const NumericFocusOrder(2),
                             child: Expanded(
@@ -434,6 +522,116 @@ class EditableBookHeader extends StatelessWidget {
       children: [
         BookIcons(i: i, collections: collections, onBookUpdated: onBookUpdated),
       ],
+    );
+  }
+}
+
+class ListViewWidget extends StatelessWidget {
+  final List<Book> books;
+  final Collection collections;
+  final ValueChanged<Book> onBookUpdated;
+
+  const ListViewWidget({
+    super.key,
+    required this.books,
+    required this.collections,
+    required this.onBookUpdated,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: books.length,
+      itemBuilder: (context, index) {
+        final book = books[index];
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: colorScheme.outlineVariant),
+            boxShadow: [
+              BoxShadow(
+                color: colorScheme.shadow.withValues(alpha: 0.06),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(22),
+              onTap: () async {
+                await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        EditableBook(i: book, collections: collections),
+                  ),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: SizedBox(
+                        width: 64,
+                        height: 82,
+                        child: buildInventoryImage(
+                          source: book.img,
+                          width: 64,
+                          height: 82,
+                          fit: BoxFit.cover,
+                          semanticLabel: '${book.name} item image',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            book.name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            book.author,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 18,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

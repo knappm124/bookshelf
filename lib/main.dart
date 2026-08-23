@@ -3,6 +3,7 @@ import 'utilities/book.dart';
 import 'utilities/file_utils.dart';
 import 'utilities/bookwidgets.dart';
 import 'utilities/isbnscanner.dart';
+import 'utilities/menu.dart';
 
 import 'dart:async';
 import 'dart:math' as math;
@@ -236,13 +237,39 @@ class _MainAppState extends State<MainApp> {
     }
   }
 
+  Future<void> _openSettings() async {
+    if (_collections == null) {
+      return;
+    }
+
+    await _navigatorKey.currentState?.push<void>(
+      MaterialPageRoute(builder: (context) => Menu(c: _collections!)),
+    );
+
+    if (!mounted) {
+      return;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return MaterialApp(
         theme: buildAppTheme(),
         home: Scaffold(
-          appBar: AppBar(title: const Text('My Bookshelf')),
+          appBar: AppBar(
+            automaticallyImplyLeading: false,
+            title: const Text('My Bookshelf'),
+            actions: [
+              IconButton(
+                icon: Icon(Icons.settings),
+                tooltip: 'Settings',
+                onPressed: () {
+                  unawaited(_openSettings());
+                },
+              ),
+            ],
+          ),
           body: Center(
             child: _loadErrorMessage == null
                 ? const CircularProgressIndicator()
@@ -296,6 +323,15 @@ class _MainAppState extends State<MainApp> {
         appBar: AppBar(
           automaticallyImplyLeading: false,
           title: const Text('My Bookshelf'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.settings),
+              tooltip: 'Settings',
+              onPressed: () {
+                unawaited(_openSettings());
+              },
+            ),
+          ],
         ),
         body: SafeArea(
           child: Scroll(
@@ -317,6 +353,7 @@ class _MainAppState extends State<MainApp> {
       ),
     );
   }
+
   Future<void> _openNewBook() async {
     if (_collections == null) {
       return;
@@ -363,6 +400,10 @@ class _MainAppState extends State<MainApp> {
     if (!mounted || result == null) {
       return;
     }
+
+    setState(() {
+      _filteredBooks = null;
+    });
   }
 }
 
@@ -392,6 +433,7 @@ class _ScrollState extends State<Scroll> {
   SortField _sortField = SortField.name;
   bool _sortAscending = true;
   bool _showSortArrow = false;
+  bool _isListView = false;
 
   @override
   void dispose() {
@@ -482,7 +524,6 @@ class _ScrollState extends State<Scroll> {
     );
   }
 
-
   Widget _buildControlPanel(BuildContext context, {required bool hasSearch}) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -569,12 +610,26 @@ class _ScrollState extends State<Scroll> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Your Books',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Your Books',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  LayoutIcons(
+                    isListView: _isListView,
+                    onViewChanged: (isListView) {
+                      setState(() {
+                        _isListView = isListView;
+                      });
+                    },
+                  ),
+                ],
               ),
+
               const SizedBox(height: 4),
             ],
           ),
@@ -666,7 +721,7 @@ class _ScrollState extends State<Scroll> {
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
-                                Icons.inventory_2_outlined,
+                                Icons.book_outlined,
                                 size: 36,
                                 color: Theme.of(context).colorScheme.primary,
                               ),
@@ -674,7 +729,7 @@ class _ScrollState extends State<Scroll> {
                             const SizedBox(height: 14),
                             Text(
                               hasNoBooks
-                                  ? 'Start building your inventory'
+                                  ? 'Start adding books'
                                   : 'No Books in this view',
                               style: Theme.of(context).textTheme.titleLarge
                                   ?.copyWith(fontWeight: FontWeight.w800),
@@ -705,40 +760,30 @@ class _ScrollState extends State<Scroll> {
                 else
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 180),
-                    child: ListView.builder(
-                      key: ValueKey(
-                        '${booksToDisplay.length}-${_sortField.name}-$_sortAscending-${_searchQuery.trim()}',
-                      ),
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      padding: const EdgeInsets.only(bottom: 12),
-                      itemCount: booksToDisplay.length,
-                      itemBuilder: (context, index) {
-                        final book = booksToDisplay[index];
-                        final durationMs = 180 + (index * 18).clamp(0, 180);
-
-                        return TweenAnimationBuilder<double>(
-                          tween: Tween(begin: 0, end: 1),
-                          duration: Duration(milliseconds: durationMs),
-                          curve: Curves.easeOutCubic,
-                          child: BookRow(
-                            key: ValueKey(book.id),
-                            i: book,
-                            index: index,
+                    child: _isListView
+                        ? ListViewWidget(
+                            key: const ValueKey('list-view'),
+                            books: booksToDisplay,
                             collections: widget.collections,
+                            onBookUpdated: (_) => setState(() {}),
+                          )
+                        : GridView.builder(
+                            key: const ValueKey('grid-view'),
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate:
+                                const SliverGridDelegateWithMaxCrossAxisExtent(
+                                  maxCrossAxisExtent: 100,
+                                  mainAxisExtent: 120,
+                                  crossAxisSpacing: 4,
+                                  mainAxisSpacing: 4,
+                                ),
+                            itemCount: booksToDisplay.length,
+                            itemBuilder: (context, index) => _buildAnimatedBook(
+                              booksToDisplay[index],
+                              index,
+                            ),
                           ),
-                          builder: (context, value, child) {
-                            return Opacity(
-                              opacity: value,
-                              child: Transform.translate(
-                                offset: Offset(0, (1 - value) * 10),
-                                child: child,
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
                   ),
               ],
             ),
@@ -747,5 +792,59 @@ class _ScrollState extends State<Scroll> {
       ),
     );
   }
+
+  Widget _buildAnimatedBook(Book book, int index) {
+    final durationMs = 180 + (index * 18).clamp(0, 180);
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: Duration(milliseconds: durationMs),
+      curve: Curves.easeOutCubic,
+      child: BookRow(
+        key: ValueKey(book.id),
+        i: book,
+        index: index,
+        collections: widget.collections,
+      ),
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, (1 - value) * 10),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
 }
 
+class LayoutIcons extends StatelessWidget {
+  final bool isListView;
+  final ValueChanged<bool> onViewChanged;
+
+  const LayoutIcons({
+    super.key,
+    required this.isListView,
+    required this.onViewChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        IconButton(
+          icon: const Icon(Icons.grid_view),
+          tooltip: 'Grid View',
+          onPressed: () => onViewChanged(false),
+        ),
+        const SizedBox(width: 8),
+        IconButton(
+          icon: const Icon(Icons.list),
+          tooltip: 'List View',
+          onPressed: () => onViewChanged(true),
+        ),
+      ],
+    );
+  }
+}

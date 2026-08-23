@@ -26,7 +26,7 @@ class _AddBookState extends State<AddBook> {
   final TextEditingController _reviewController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
 
-  Future<void> _addBookAndPersist() async {
+  Future<Book> _addBookAndPersist() async {
     String name = _nameController.text;
     String author = _authorController.text;
     String img = _imagePaths;
@@ -51,11 +51,7 @@ class _AddBookState extends State<AddBook> {
     widget.collection.addBook(newBook);
     await saveCollectionToStorage(widget.collection);
 
-    _nameController.clear();
-    _authorController.clear();
-    _genresController.clear();
-    _reviewController.clear();
-    _descriptionController.clear();
+    return newBook;
   }
 
   @override
@@ -173,7 +169,11 @@ class _AddBookState extends State<AddBook> {
               const SizedBox(height: fieldSpacing),
               ElevatedButton(
                 onPressed: () async {
-                  await _addBookAndPersist();
+                  final book = await _addBookAndPersist();
+                  if (!mounted) {
+                    return;
+                  }
+                  Navigator.of(this.context).pop(book);
                 },
                 child: const Text('Add Book'),
               ),
@@ -326,7 +326,7 @@ class _ImageUploaderScreenState extends State<ImageUploaderScreen> {
                               borderRadius: BorderRadius.circular(21),
                               child: Image.memory(
                                 primaryPreview,
-                                fit: BoxFit.cover,
+                                fit: BoxFit.contain,
                               ),
                             )
                           : Icon(

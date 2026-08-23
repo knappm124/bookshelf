@@ -19,6 +19,8 @@ class IsbnScanner extends StatefulWidget {
 
 class IsbnScannerState extends State<IsbnScanner> {
   static const String isbnPrefix = '978';
+  static const String isbnPrefix2 =
+      '979'; // Optional: Handle ISBN-13 with prefix 979
   final MobileScannerController _cameraController = MobileScannerController(
     formats: [BarcodeFormat.ean13], // ISBN-13 books always use EAN-13 encoding
     autoStart: false,
@@ -38,12 +40,7 @@ class IsbnScannerState extends State<IsbnScanner> {
   }
 
   static String? extractIsbn(String scannedData) {
-    // Check if the scanned data starts with the ISBN prefix
-    if (scannedData.startsWith(isbnPrefix)) {
-      // Extract the ISBN number from the scanned data
-      return scannedData.substring(3); // Remove the '978' prefix
-    }
-    return null; // Return null if not a valid ISBN
+    return scannedData;
   }
 
   Future<void> _addScannedBook() async {
@@ -105,7 +102,8 @@ class IsbnScannerState extends State<IsbnScanner> {
                           .catchError((error) {
                             setState(() {
                               _scannedBook = null;
-                              _bookTitle = "Failed to load book details";
+                              _bookTitle =
+                                  "Failed to load book details for ISBN: $code";
                               _bookAuthor = "";
                               _coverUrl = "";
                             });

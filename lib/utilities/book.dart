@@ -5,23 +5,23 @@ class Collection {
   final String _id;
   String _name;
   List<Tag> _tags;
-  List<Book> _books;
+  List<Bookshelf> _bookshelf;
 
   Collection({
     String? id,
     required this._name,
-    List<Book>? books,
+    List<Bookshelf>? bookshelves,
     List<Tag>? tags,
   }) : _id = id ?? Collection._uuid.v4(),
-       _books = books ?? [],
+       _bookshelf = bookshelves ?? [],
        _tags = tags ?? [];
 
   set name(String name) {
     _name = name;
   }
 
-  set books(List<Book> books) {
-    _books = books;
+  set bookshelves(List<Bookshelf> bookshelves) {
+    _bookshelf = bookshelves;
   }
 
   set tags(List<Tag> tags) {
@@ -30,21 +30,27 @@ class Collection {
 
   String get id => _id;
   String get name => _name;
-  List<Book> get books => _books;
+  List<Bookshelf> get bookshelves => _bookshelf;
   List<Tag> get tags => _tags;
 
-  void addBook(Book book) {
-    _books.add(book);
+  List<String> getAllBookshelfNames() {
+    return _bookshelf.map((bookshelf) => bookshelf.name).toList();
   }
 
-  void removeBook(Book book) {
-    _books.remove(book);
+  void addBookshelf(String name) {
+    _bookshelf.add(Bookshelf(name: name));
   }
 
-  void editBook(Book oldBook, Book newBook) {
-    int index = _books.indexWhere((book) => book.id == oldBook.id);
+  void removeBookshelf(String name) {
+    _bookshelf.removeWhere((bookshelf) => bookshelf.name == name);
+  }
+
+  void editBookshelf(String oldBookshelf, String newBookshelf) {
+    final index = _bookshelf.indexWhere(
+      (bookshelf) => bookshelf.name == oldBookshelf,
+    );
     if (index != -1) {
-      _books[index] = newBook;
+      _bookshelf[index].name = newBookshelf;
     }
   }
 
@@ -62,22 +68,32 @@ class Collection {
       _tags[index] = newTag;
     }
   }
+
   List<String> getAllTagNames() {
     return _tags.map((tag) => tag.name).toList();
   }
 
   void addTagOption(String tagName, String option) {
-    final tag = _tags.firstWhere((tag) => tag.name == tagName, orElse: () => throw Exception('Tag not found'));
+    final tag = _tags.firstWhere(
+      (tag) => tag.name == tagName,
+      orElse: () => throw Exception('Tag not found'),
+    );
     tag.addOption(option);
   }
 
   void removeTagOption(String tagName, String option) {
-    final tag = _tags.firstWhere((tag) => tag.name == tagName, orElse: () => throw Exception('Tag not found'));
+    final tag = _tags.firstWhere(
+      (tag) => tag.name == tagName,
+      orElse: () => throw Exception('Tag not found'),
+    );
     tag.removeOption(option);
   }
 
   void renameTagOption(String tagName, String oldOption, String newOption) {
-    final tag = _tags.firstWhere((tag) => tag.name == tagName, orElse: () => throw Exception('Tag not found'));
+    final tag = _tags.firstWhere(
+      (tag) => tag.name == tagName,
+      orElse: () => throw Exception('Tag not found'),
+    );
     final index = tag.options.indexOf(oldOption);
     if (index != -1) {
       tag.options[index] = newOption;
@@ -90,9 +106,12 @@ class Collection {
       _tags[index].name = newName;
     }
   }
-  
+
   List<String> getTagOptions(String tagName) {
-    final tag = _tags.firstWhere((tag) => tag.name == tagName, orElse: () => throw Exception('Tag not found'));
+    final tag = _tags.firstWhere(
+      (tag) => tag.name == tagName,
+      orElse: () => throw Exception('Tag not found'),
+    );
     return tag.options;
   }
 }
@@ -104,8 +123,8 @@ class Tag {
   List<String> _options;
 
   Tag({String? id, required this._name, List<String>? options})
-      : _id = id ?? Tag._uuid.v4(),
-        _options = options ?? [];
+    : _id = id ?? Tag._uuid.v4(),
+      _options = options ?? [];
 
   set name(String name) {
     _name = name;
@@ -140,6 +159,7 @@ class Book {
   int _rating;
   String _review;
   String _description;
+  Map<Tag, List<String>> _tags;
 
   Book({
     String? id,
@@ -151,13 +171,15 @@ class Book {
     int? rating,
     String? review,
     String? description,
+    Map<Tag, List<String>>? tags,
   }) : _id = id ?? Book._uuid.v4(),
        _isbn = isbn ?? '',
        _rating = rating ?? 0,
        _review = review ?? '',
        _img = img ?? '',
        _genres = genres ?? [],
-       _description = description ?? '';
+       _description = description ?? '',
+       _tags = tags ?? {};
 
   set name(String name) {
     _name = name;
@@ -191,6 +213,27 @@ class Book {
     _description = description;
   }
 
+  set tags(Map<Tag, List<String>> tags) {
+    _tags = tags;
+  }
+
+  void addTag(Tag tag, List<String> options) {
+    _tags[tag] = options;
+  }
+  
+  void removeTag(String name) {
+    _tags.removeWhere((tag, options) => tag.name == name);
+  }
+
+  bool containsOption(String tagName, String option) {
+    final tag = _tags.keys.firstWhere(
+      (t) => t.name == tagName,
+      orElse: () => Tag(name: tagName),
+    );
+    final options = _tags[tag] ?? [];
+    return options.contains(option);
+  }
+
   String get id => _id;
   String get name => _name;
   String get author => _author;
@@ -200,4 +243,43 @@ class Book {
   int get rating => _rating;
   String get review => _review;
   String get description => _description;
+  Map<Tag, List<String>> get tags => _tags;
+}
+
+class Bookshelf {
+  static final Uuid _uuid = Uuid();
+  final String _id;
+  String _name;
+  List<Book> _books;
+
+  Bookshelf({String? id, required this._name, List<Book>? books})
+    : _id = id ?? Bookshelf._uuid.v4(),
+      _books = books ?? [];
+
+  set name(String name) {
+    _name = name;
+  }
+
+  set books(List<Book> books) {
+    _books = books;
+  }
+
+  String get name => _name;
+  String get id => _id;
+  List<Book> get books => _books;
+
+  void addBook(Book book) {
+    _books.add(book);
+  }
+
+  void removeBook(Book book) {
+    _books.removeWhere((b) => b.id == book.id);
+  }
+
+  void updateBook(Book book, Book updatedBook) {
+    final index = _books.indexWhere((b) => b.id == book.id);
+    if (index != -1) {
+      _books[index] = updatedBook;
+    }
+  }
 }

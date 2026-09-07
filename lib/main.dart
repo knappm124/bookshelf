@@ -2,23 +2,27 @@ import 'utilities/addbook.dart';
 import 'utilities/book.dart';
 import 'utilities/file_utils.dart';
 import 'utilities/bookwidgets.dart';
+import 'utilities/filter.dart';
 import 'utilities/isbnscanner.dart';
 import 'utilities/menu.dart';
 
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:logging/logging.dart';
 
-ThemeData buildAppTheme() {
+ThemeData buildAppTheme({Brightness brightness = Brightness.light}) {
   final colorScheme = ColorScheme.fromSeed(
     seedColor: const Color(0xFF0E7490),
-    brightness: Brightness.light,
+    brightness: brightness,
   );
-  final baseTextTheme = GoogleFonts.dmSansTextTheme();
+  final baseTextTheme = GoogleFonts.dmSansTextTheme(
+    ThemeData(brightness: brightness).textTheme,
+  );
   final sectionShape = RoundedRectangleBorder(
     borderRadius: BorderRadius.circular(22),
   );
@@ -35,12 +39,24 @@ ThemeData buildAppTheme() {
     ),
     canvasColor: colorScheme.surface,
     textTheme: baseTextTheme.copyWith(
-      displaySmall: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
-      titleLarge: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
-      titleMedium: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
-      labelLarge: GoogleFonts.dmSans(fontWeight: FontWeight.w600),
-      bodyMedium: GoogleFonts.dmSans(),
-      bodySmall: GoogleFonts.dmSans(color: colorScheme.onSurface),
+      displaySmall: baseTextTheme.displaySmall?.copyWith(
+        fontWeight: FontWeight.w700,
+      ),
+      titleLarge: baseTextTheme.titleLarge?.copyWith(
+        fontWeight: FontWeight.w700,
+      ),
+      titleMedium: baseTextTheme.titleMedium?.copyWith(
+        fontWeight: FontWeight.w700,
+      ),
+      labelLarge: baseTextTheme.labelLarge?.copyWith(
+        fontWeight: FontWeight.w600,
+      ),
+      bodyMedium: baseTextTheme.bodyMedium?.copyWith(
+        color: colorScheme.onSurface,
+      ),
+      bodySmall: baseTextTheme.bodySmall?.copyWith(
+        color: colorScheme.onSurface,
+      ),
     ),
     appBarTheme: AppBarTheme(
       centerTitle: false,
@@ -200,7 +216,10 @@ class MainApp extends StatefulWidget {
 class _MainAppState extends State<MainApp> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  ThemeMode _themeMode = ThemeMode.system;
+  static const String _themeModePrefKey = 'bookshelf.themeMode';
   Collection? _collections;
+  Bookshelf? _bookshelf;
   List<Book>? _filteredBooks;
   String? _loadErrorMessage;
   bool _isLoading = true;
@@ -214,6 +233,16 @@ class _MainAppState extends State<MainApp> {
   Future<void> _loadCollections() async {
     try {
       final loadedCollection = await loadCollectionFromStorage();
+      final collections =
+          loadedCollection ??
+          Collection(
+            name: 'My Bookshelf',
+            bookshelves: [Bookshelf(name: 'Default')],
+          );
+
+      if (collections.bookshelves.isEmpty) {
+        collections.addBookshelf('Default');
+      }
 
       if (!mounted) {
         return;
@@ -221,8 +250,7 @@ class _MainAppState extends State<MainApp> {
 
       setState(() {
         _loadErrorMessage = null;
-        _collections =
-            loadedCollection ?? Collection(name: 'My Bookshelf', books: []);
+        _collections = collections;
         _isLoading = false;
       });
     } catch (_) {
@@ -231,10 +259,23 @@ class _MainAppState extends State<MainApp> {
       }
       setState(() {
         _collections = null;
-        _loadErrorMessage = 'Failed to load inventory data.';
+        _loadErrorMessage = 'Failed to load collection data.';
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _onThemeModeChanged(ThemeMode themeMode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_themeModePrefKey, themeMode.name);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _themeMode = themeMode;
+    });
   }
 
   Future<void> _openSettings() async {
@@ -243,11 +284,46 @@ class _MainAppState extends State<MainApp> {
     }
 
     await _navigatorKey.currentState?.push<void>(
-      MaterialPageRoute(builder: (context) => Menu(c: _collections!)),
+      MaterialPageRoute(
+        builder: (context) => Menu(
+          c: _collections!,
+          filteredBooks: _filteredBooks,
+          themeMode: _themeMode,
+          onThemeModeChanged: _onThemeModeChanged,
+        ),
+      ),
     );
 
     if (!mounted) {
       return;
+    }
+
+    setState(() {
+      _bookshelf = _selectedBookshelf(_collections!);
+    });
+  }
+
+  Bookshelf _selectedBookshelf(Collection collections) {
+    final selectedBookshelf = _bookshelf;
+    if (selectedBookshelf != null) {
+      for (final bookshelf in collections.bookshelves) {
+        if (bookshelf.id == selectedBookshelf.id) {
+          return bookshelf;
+        }
+      }
+    }
+    return collections.bookshelves.first;
+  }
+
+  void _selectBookshelf(Collection collections, String bookshelfId) {
+    for (final bookshelf in collections.bookshelves) {
+      if (bookshelf.id == bookshelfId) {
+        setState(() {
+          _bookshelf = bookshelf;
+          _filteredBooks = null;
+        });
+        return;
+      }
     }
   }
 
@@ -256,6 +332,8 @@ class _MainAppState extends State<MainApp> {
     if (_isLoading) {
       return MaterialApp(
         theme: buildAppTheme(),
+        darkTheme: buildAppTheme(brightness: Brightness.dark),
+        themeMode: _themeMode,
         home: Scaffold(
           appBar: AppBar(
             automaticallyImplyLeading: false,
@@ -315,8 +393,18 @@ class _MainAppState extends State<MainApp> {
       );
     }
 
+    final collections =
+        _collections ??
+        Collection(
+          name: 'My Bookshelf',
+          bookshelves: [Bookshelf(name: 'Default')],
+        );
+    final selectedBookshelf = _selectedBookshelf(collections);
+
     return MaterialApp(
       theme: buildAppTheme(),
+      darkTheme: buildAppTheme(brightness: Brightness.dark),
+      themeMode: _themeMode,
       navigatorKey: _navigatorKey,
       home: Scaffold(
         key: _scaffoldKey,
@@ -335,8 +423,11 @@ class _MainAppState extends State<MainApp> {
         ),
         body: SafeArea(
           child: Scroll(
-            collections:
-                _collections ?? Collection(name: 'My Bookshelf', books: []),
+            collections: collections,
+            bookshelf: selectedBookshelf,
+            onBookshelfSelected: (bookshelfId) {
+              _selectBookshelf(collections, bookshelfId);
+            },
             filteredBooks: _filteredBooks,
             onAddPressed: () {
               unawaited(_openNewBook());
@@ -359,6 +450,7 @@ class _MainAppState extends State<MainApp> {
       return;
     }
 
+    final selectedBookshelf = _selectedBookshelf(_collections!);
     final context = _navigatorKey.currentContext;
     if (context == null) {
       return;
@@ -392,8 +484,11 @@ class _MainAppState extends State<MainApp> {
     final result = await _navigatorKey.currentState?.push<Book>(
       MaterialPageRoute(
         builder: (context) => choice == _AddBookMethod.manual
-            ? AddBook(collection: _collections!)
-            : IsbnScanner(collection: _collections!),
+            ? AddBook(collection: _collections!, bookshelf: selectedBookshelf)
+            : IsbnScanner(
+                collection: _collections!,
+                bookshelf: selectedBookshelf,
+              ),
       ),
     );
 
@@ -411,12 +506,16 @@ enum _AddBookMethod { manual, scan }
 
 class Scroll extends StatefulWidget {
   final Collection collections;
+  final Bookshelf bookshelf;
+  final ValueChanged<String> onBookshelfSelected;
   final List<Book>? filteredBooks;
   final VoidCallback onAddPressed;
 
   const Scroll({
     super.key,
     required this.collections,
+    required this.bookshelf,
+    required this.onBookshelfSelected,
     required this.filteredBooks,
     required this.onAddPressed,
   });
@@ -430,6 +529,7 @@ enum SortField { name, author }
 class _ScrollState extends State<Scroll> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  FilterCriteria _filterCriteria = const FilterCriteria();
   SortField _sortField = SortField.name;
   bool _sortAscending = true;
   bool _showSortArrow = false;
@@ -448,9 +548,63 @@ class _ScrollState extends State<Scroll> {
     });
   }
 
+  Future<void> _openFilter() async {
+    await Navigator.of(context).push<void>(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black54,
+        pageBuilder: (context, animation, secondaryAnimation) {
+          final screenWidth = MediaQuery.sizeOf(context).width;
+          return Align(
+            alignment: Alignment.bottomCenter,
+            child: FractionallySizedBox(
+              widthFactor: 1,
+              heightFactor: screenWidth >= 700 ? 0.78 : 0.86,
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(28),
+                ),
+                child: SafeArea(
+                  top: false,
+                  child: Filter(
+                    c: widget.collections,
+                    bookshelf: widget.bookshelf,
+                    criteria: _filterCriteria,
+                    onFilterChanged: (_) {
+                      setState(() {});
+                    },
+                    onCriteriaChanged: (criteria) {
+                      setState(() {
+                        _filterCriteria = criteria;
+                      });
+                    },
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          final slide = Tween<Offset>(
+            begin: const Offset(0, 1),
+            end: Offset.zero,
+          ).chain(CurveTween(curve: Curves.easeOutCubic));
+          return SlideTransition(
+            position: animation.drive(slide),
+            child: child,
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 280),
+        reverseTransitionDuration: const Duration(milliseconds: 220),
+      ),
+    );
+  }
+
   List<Book> _buildVisibleBooks() {
     final baseBooks = List<Book>.from(
-      widget.filteredBooks ?? widget.collections.books,
+      _filterCriteria.hasActiveFilters
+          ? _filterCriteria.apply(widget.bookshelf.books)
+          : (widget.filteredBooks ?? widget.bookshelf.books),
     );
     final query = _searchQuery.trim().toLowerCase();
 
@@ -545,6 +699,90 @@ class _ScrollState extends State<Scroll> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          LayoutBuilder(
+            builder: (context, constraints) => MenuAnchor(
+              alignmentOffset: const Offset(0, 4),
+              style: MenuStyle(
+                backgroundColor: WidgetStatePropertyAll(
+                  colorScheme.surfaceContainerHigh,
+                ),
+                padding: const WidgetStatePropertyAll(EdgeInsets.zero),
+                shape: WidgetStatePropertyAll(
+                  RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+              menuChildren: [
+                for (final bookshelf in widget.collections.bookshelves)
+                  SizedBox(
+                    width: constraints.maxWidth,
+                    child: MenuItemButton(
+                      onPressed: () {
+                        widget.onBookshelfSelected(bookshelf.id);
+                      },
+                      child: Text(
+                        bookshelf.name,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+              ],
+              builder: (context, controller, child) => Semantics(
+                button: true,
+                label: 'Switch collection',
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () {
+                      if (controller.isOpen) {
+                        controller.close();
+                      } else {
+                        controller.open();
+                      }
+                    },
+                    child: InputDecorator(
+                      isEmpty: false,
+                      decoration: InputDecoration(
+                        labelText: 'Switch collection',
+                        filled: true,
+                        fillColor: colorScheme.primaryContainer.withValues(
+                          alpha: 0.34,
+                        ),
+                        prefixIcon: Icon(
+                          Icons.collections_bookmark_outlined,
+                          color: colorScheme.primary,
+                        ),
+                        floatingLabelStyle: TextStyle(
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              widget.bookshelf.name,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: colorScheme.onSurface,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: colorScheme.primary,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
           Row(
             children: [
               Expanded(
@@ -575,6 +813,14 @@ class _ScrollState extends State<Scroll> {
                 ),
               ),
               const SizedBox(width: 10),
+              IconButton.filledTonal(
+                onPressed: _openFilter,
+                tooltip: 'Filter books',
+                icon: Badge(
+                  isLabelVisible: _filterCriteria.hasActiveFilters,
+                  child: const Icon(Icons.filter_list),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -642,8 +888,8 @@ class _ScrollState extends State<Scroll> {
   Widget build(BuildContext context) {
     final booksToDisplay = _buildVisibleBooks();
     final hasSearch = _searchQuery.trim().isNotEmpty;
-    final hasNoBooks = widget.collections.books.isEmpty;
-    final totalBooks = widget.collections.books.length;
+    final hasNoBooks = widget.bookshelf.books.isEmpty;
+    final totalBooks = widget.bookshelf.books.length;
     final visibleCount = booksToDisplay.length;
 
     String emptyStateMessage = 'No Books yet. Tap + to add your first Book.';
@@ -739,7 +985,12 @@ class _ScrollState extends State<Scroll> {
                             Text(
                               emptyStateMessage,
                               textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.bodyLarge,
+                              style: Theme.of(context).textTheme.bodyLarge
+                                  ?.copyWith(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                                  ),
                             ),
                             const SizedBox(height: 16),
                             FilledButton.icon(
@@ -764,8 +1015,9 @@ class _ScrollState extends State<Scroll> {
                         ? ListViewWidget(
                             key: const ValueKey('list-view'),
                             books: booksToDisplay,
-                            collections: widget.collections,
+                            bookshelf: widget.bookshelf,
                             onBookUpdated: (_) => setState(() {}),
+                            collections: widget.collections,
                           )
                         : GridView.builder(
                             key: const ValueKey('grid-view'),
@@ -804,6 +1056,7 @@ class _ScrollState extends State<Scroll> {
         key: ValueKey(book.id),
         i: book,
         index: index,
+        bookshelf: widget.bookshelf,
         collections: widget.collections,
       ),
       builder: (context, value, child) {

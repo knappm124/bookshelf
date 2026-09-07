@@ -8,12 +8,14 @@ import 'image_utils.dart';
 
 class BookIcons extends StatelessWidget {
   final Book i;
+  final Bookshelf bookshelf;
   final Collection collections;
   final ValueChanged<Book> onBookUpdated;
 
   const BookIcons({
     super.key,
     required this.i,
+    required this.bookshelf,
     required this.collections,
     required this.onBookUpdated,
   });
@@ -27,7 +29,7 @@ class BookIcons extends StatelessWidget {
             final updatedBook = await Navigator.of(context).push<Book?>(
               MaterialPageRoute(
                 builder: (context) =>
-                    EditingBook(i: i, collections: collections),
+                    EditingBook(i: i, bookshelf: bookshelf, collections: collections),
               ),
             );
             if (updatedBook != null) {
@@ -66,7 +68,7 @@ class BookIcons extends StatelessWidget {
               return;
             }
 
-            collections.removeBook(i);
+            bookshelf.removeBook(i);
             messenger.showSnackBar(
               SnackBar(
                 content: Text('Deleted "${i.name}"'),
@@ -74,7 +76,7 @@ class BookIcons extends StatelessWidget {
                 action: SnackBarAction(
                   label: 'Undo',
                   onPressed: () {
-                    collections.addBook(i);
+                    bookshelf.addBook(i);
                   },
                 ),
               ),
@@ -92,6 +94,7 @@ class BookIcons extends StatelessWidget {
 class BookRow extends StatelessWidget {
   final Book i;
   final int index;
+  final Bookshelf bookshelf;
   final Collection collections;
   static const double _maxCoverDimension = 150;
 
@@ -99,6 +102,7 @@ class BookRow extends StatelessWidget {
     super.key,
     required this.i,
     required this.index,
+    required this.bookshelf,
     required this.collections,
   });
 
@@ -188,7 +192,7 @@ class BookRow extends StatelessWidget {
                   context,
                   MaterialPageRoute(
                     builder: (context) =>
-                        EditableBook(i: i, collections: collections),
+                        EditableBook(i: i, bookshelf: bookshelf, collections: collections),
                   ),
                 );
               },
@@ -227,9 +231,10 @@ class BookRow extends StatelessWidget {
 
 class EditableBook extends StatefulWidget {
   final Book i;
+  final Bookshelf bookshelf;
   final Collection collections;
 
-  const EditableBook({super.key, required this.i, required this.collections});
+  const EditableBook({super.key, required this.i, required this.bookshelf, required this.collections});
 
   @override
   State<EditableBook> createState() => _EditableBookState();
@@ -237,11 +242,13 @@ class EditableBook extends StatefulWidget {
 
 class _EditableBookState extends State<EditableBook> {
   late Book _item;
+  late final Collection collections;
 
   @override
   void initState() {
     super.initState();
     _item = widget.i;
+    collections = widget.collections;
   }
 
   void _handleBookUpdated(Book updatedBook) {
@@ -483,8 +490,9 @@ class _EditableBookState extends State<EditableBook> {
                                 ),
                                 child: EditableBookHeader(
                                   i: _item,
-                                  collections: widget.collections,
+                                  bookshelf: widget.bookshelf,
                                   onBookUpdated: _handleBookUpdated,
+                                  collections: collections,
                                 ),
                               ),
                             ),
@@ -505,12 +513,14 @@ class _EditableBookState extends State<EditableBook> {
 
 class EditableBookHeader extends StatelessWidget {
   final Book i;
+  final Bookshelf bookshelf;
   final Collection collections;
   final ValueChanged<Book> onBookUpdated;
 
   const EditableBookHeader({
     super.key,
     required this.i,
+    required this.bookshelf,
     required this.collections,
     required this.onBookUpdated,
   });
@@ -520,7 +530,7 @@ class EditableBookHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        BookIcons(i: i, collections: collections, onBookUpdated: onBookUpdated),
+        BookIcons(i: i, bookshelf: bookshelf, onBookUpdated: onBookUpdated, collections: collections,),
       ],
     );
   }
@@ -528,12 +538,14 @@ class EditableBookHeader extends StatelessWidget {
 
 class ListViewWidget extends StatelessWidget {
   final List<Book> books;
+  final Bookshelf bookshelf;
   final Collection collections;
   final ValueChanged<Book> onBookUpdated;
 
   const ListViewWidget({
     super.key,
     required this.books,
+    required this.bookshelf,
     required this.collections,
     required this.onBookUpdated,
   });
@@ -572,7 +584,7 @@ class ListViewWidget extends StatelessWidget {
                   context,
                   MaterialPageRoute(
                     builder: (context) =>
-                        EditableBook(i: book, collections: collections),
+                        EditableBook(i: book, bookshelf: bookshelf, collections: collections),
                   ),
                 );
               },

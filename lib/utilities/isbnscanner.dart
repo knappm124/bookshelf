@@ -10,8 +10,13 @@ import 'image_utils.dart';
 
 class IsbnScanner extends StatefulWidget {
   final Collection collection;
+  final Bookshelf bookshelf;
 
-  const IsbnScanner({super.key, required this.collection});
+  const IsbnScanner({
+    super.key,
+    required this.collection,
+    required this.bookshelf,
+  });
 
   @override
   IsbnScannerState createState() => IsbnScannerState();
@@ -50,7 +55,7 @@ class IsbnScannerState extends State<IsbnScanner> {
     }
 
     setState(() => _isSaving = true);
-    widget.collection.addBook(book);
+    widget.bookshelf.addBook(book);
     await saveCollectionToStorage(widget.collection);
 
     if (!mounted) {
@@ -149,7 +154,9 @@ class IsbnScannerState extends State<IsbnScanner> {
                   if (_bookAuthor.isNotEmpty)
                     Text(
                       _bookAuthor,
-                      style: const TextStyle(fontSize: 14, color: Colors.grey),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   const SizedBox(height: 16),
                   if (!_isScanning) ...[

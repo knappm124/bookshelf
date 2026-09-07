@@ -9,47 +9,91 @@ Collection collectionFromJson(String json) {
   final Map<String, dynamic> collectionMap = jsonDecode(json);
   final String collectionName = collectionMap['name'] as String? ?? '';
   final String collectionId = collectionMap['id'] as String? ?? '';
-  List<Book> books = [];
-  final rawBooks = collectionMap['books'];
-  if (rawBooks is List) {
-    for (final rawBook in rawBooks) {
-      final bookMap = rawBook as Map<String, dynamic>;
-      books.add(
-        Book(
-          id: bookMap['id'] as String?,
-          name: bookMap['name'] as String? ?? '',
-          author: bookMap['author'] as String? ?? '',
-          genres: List<String>.from(bookMap['genres'] ?? []),
-          isbn: bookMap['isbn'] as String?,
-          img: bookMap['img'] as String?,
-          rating: bookMap['rating'] as int?,
-          review: bookMap['review'] as String?,
-          description: bookMap['description'] as String?,
+  List<Bookshelf> bookshelves = [];
+  final rawBookshelves = collectionMap['bookshelves'];
+  if (rawBookshelves is List) {
+    for (final rawBookshelf in rawBookshelves) {
+      final bookshelfMap = rawBookshelf as Map<String, dynamic>;
+      List<Book> shelfBooks = [];
+      final rawShelfBooks = bookshelfMap['books'];
+      if (rawShelfBooks is List) {
+        for (final rawBook in rawShelfBooks) {
+          final bookMap = rawBook as Map<String, dynamic>;
+          shelfBooks.add(
+            Book(
+              id: bookMap['id'] as String?,
+              name: bookMap['name'] as String? ?? '',
+              author: bookMap['author'] as String? ?? '',
+              genres: List<String>.from(bookMap['genres'] ?? []),
+              isbn: bookMap['isbn'] as String?,
+              img: bookMap['img'] as String?,
+              rating: bookMap['rating'] as int?,
+              review: bookMap['review'] as String?,
+              description: bookMap['description'] as String?,
+            ),
+          );
+        }
+      }
+      bookshelves.add(
+        Bookshelf(
+          id: bookshelfMap['id'] as String?,
+          name: bookshelfMap['name'] as String? ?? '',
+          books: shelfBooks,
         ),
       );
     }
   }
-  return Collection(id: collectionId, name: collectionName, books: books);
+  final tags = <Tag>[];
+  final rawTags = collectionMap['tags'];
+  if (rawTags is List) {
+    for (final rawTag in rawTags) {
+      final tagMap = rawTag as Map<String, dynamic>;
+      tags.add(
+        Tag(
+          id: tagMap['id'] as String?,
+          name: tagMap['name'] as String? ?? '',
+          options: List<String>.from(tagMap['options'] ?? []),
+        ),
+      );
+    }
+  }
+  return Collection(
+    id: collectionId,
+    name: collectionName,
+    bookshelves: bookshelves,
+    tags: tags,
+  );
 }
 
 String collectionToJson(Collection collection) {
   Map<String, dynamic> collectionMap = {
     'id': collection.id,
     'name': collection.name,
-    'books': collection.books
+    'bookshelves': collection.bookshelves
         .map(
-          (book) => {
-            'id': book.id,
-            'name': book.name,
-            'author': book.author,
-            'genres': book.genres,
-            'isbn': book.isbn,
-            'img': book.img,
-            'rating': book.rating,
-            'review': book.review,
-            'description': book.description,
+          (bookshelf) => {
+            'id': bookshelf.id,
+            'name': bookshelf.name,
+            'books': bookshelf.books
+                .map(
+                  (book) => {
+                    'id': book.id,
+                    'name': book.name,
+                    'author': book.author,
+                    'genres': book.genres,
+                    'isbn': book.isbn,
+                    'img': book.img,
+                    'rating': book.rating,
+                    'review': book.review,
+                    'description': book.description,
+                  },
+                )
+                .toList(),
           },
         )
+        .toList(),
+    'tags': collection.tags
+        .map((tag) => {'id': tag.id, 'name': tag.name, 'options': tag.options})
         .toList(),
   };
   return jsonEncode(collectionMap);

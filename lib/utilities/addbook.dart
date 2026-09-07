@@ -7,11 +7,13 @@ import 'dart:convert';
 import 'book.dart';
 import 'file_utils.dart';
 import 'image_utils.dart';
+import 'editing.dart';
 
 class AddBook extends StatefulWidget {
   final Collection collection;
+  final Bookshelf bookshelf;
 
-  const AddBook({super.key, required this.collection});
+  const AddBook({super.key, required this.bookshelf, required this.collection});
 
   @override
   State<AddBook> createState() => _AddBookState();
@@ -25,6 +27,7 @@ class _AddBookState extends State<AddBook> {
   final TextEditingController _genresController = TextEditingController();
   final TextEditingController _reviewController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
+  final Map<String, Set<String>> _selectedTagValues = {};
 
   Future<Book> _addBookAndPersist() async {
     String name = _nameController.text;
@@ -48,7 +51,14 @@ class _AddBookState extends State<AddBook> {
       rating: rating,
     );
 
-    widget.collection.addBook(newBook);
+    final i = widget.collection.bookshelves.indexWhere(
+      (bookshelf2) => widget.bookshelf.id == bookshelf2.id,
+    );
+    if (i != -1) {
+      widget.collection.bookshelves[i].addBook(newBook);
+    } else {
+      throw Exception('Bookshelf not found in the collection.');
+    }
     await saveCollectionToStorage(widget.collection);
 
     return newBook;
@@ -57,13 +67,30 @@ class _AddBookState extends State<AddBook> {
   @override
   Widget build(BuildContext context) {
     const double fieldSpacing = 12;
+    final sortedTags = widget.collection.tags.toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    final tagRows = sortedTags.map((tag) {
+      return TagSelectorRow(
+        tagName: tag.name,
+        options: (tag.options.toList())..sort(),
+        selectedValues: _selectedTagValues[tag.name] ?? <String>{},
+        onSelectionChanged: (newSelection) {
+          setState(() {
+            _selectedTagValues[tag.name] = newSelection;
+          });
+        },
+      );
+    }).toList();
 
     return Scaffold(
+      appBar: AppBar(title: const Text('Add Book')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: SingleChildScrollView(
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
+              const SizedBox(height: fieldSpacing),
               TextField(
                 controller: _nameController,
                 decoration: const InputDecoration(labelText: 'Name'),
@@ -166,6 +193,22 @@ class _AddBookState extends State<AddBook> {
                 controller: _reviewController,
                 decoration: const InputDecoration(labelText: 'Review'),
               ),
+              const SizedBox(height: fieldSpacing),
+              if (tagRows.isNotEmpty) ...[
+                const Divider(height: 28),
+                SizedBox(
+                  width: double.infinity,
+                  child: EditorSectionBlock(
+                    title: 'Tags',
+                    subtitle:
+                        'Keep categorization up to date so filtering still works well.',
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: tagRows,
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: fieldSpacing),
               ElevatedButton(
                 onPressed: () async {

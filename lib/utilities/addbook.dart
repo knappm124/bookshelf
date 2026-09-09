@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:async';
-import 'dart:convert';
 
 import 'book.dart';
+import 'api.dart';
 import 'file_utils.dart';
 import 'image_utils.dart';
 import 'editing.dart';
@@ -99,6 +99,35 @@ class _AddBookState extends State<AddBook> {
               TextField(
                 controller: _authorController,
                 decoration: const InputDecoration(labelText: 'Author'),
+              ),
+              const SizedBox(height: fieldSpacing),
+              ElevatedButton(
+                onPressed: () async {
+                  final books = await ManualBookAPI().fetchdata(
+                    _nameController.text,
+                    _authorController.text,
+                  );
+
+                  if (!context.mounted) {
+                    return;
+                  }
+                  final selectedBook = await showDialog<Book>(
+                    context: context,
+                    builder: (context) => PickBook(books: books),
+                  );
+
+                  if (selectedBook == null || !mounted) {
+                    return;
+                  }
+                  setState(() {
+                    _nameController.text = selectedBook.name;
+                    _authorController.text = selectedBook.author;
+                    _descriptionController.text = selectedBook.description;
+                    _genresController.text = selectedBook.genres.join(", ");
+                    _imagePaths = selectedBook.img;
+                  });
+                },
+                child: const Text('Try to pull info from Google Books'),
               ),
               const SizedBox(height: fieldSpacing),
               Padding(
@@ -245,7 +274,6 @@ class ImageUploaderScreen extends StatefulWidget {
 }
 
 class _ImageUploaderScreenState extends State<ImageUploaderScreen> {
-  Uint8List? _previewBytes;
   String _imagePaths = '';
   final ImagePicker _picker = ImagePicker();
 
@@ -253,16 +281,16 @@ class _ImageUploaderScreenState extends State<ImageUploaderScreen> {
   void initState() {
     super.initState();
     _imagePaths = widget.initialImagePaths;
+  }
 
-    if (_imagePaths.startsWith('data:')) {
-      final commaIndex = _imagePaths.indexOf(',');
-      if (commaIndex != -1 && commaIndex + 1 < _imagePaths.length) {
-        try {
-          _previewBytes = base64Decode(_imagePaths.substring(commaIndex + 1));
-        } catch (_) {
-          _previewBytes = null;
-        }
-      }
+  @override
+  void didUpdateWidget(covariant ImageUploaderScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialImagePaths != oldWidget.initialImagePaths &&
+        widget.initialImagePaths != _imagePaths) {
+      setState(() {
+        _imagePaths = widget.initialImagePaths;
+      });
     }
   }
 
@@ -270,7 +298,6 @@ class _ImageUploaderScreenState extends State<ImageUploaderScreen> {
     if (_imagePaths.isNotEmpty) {
       setState(() {
         _imagePaths = '';
-        _previewBytes = null;
       });
       widget.onImageChanged?.call('');
       return;
@@ -308,7 +335,6 @@ class _ImageUploaderScreenState extends State<ImageUploaderScreen> {
 
       setState(() {
         _imagePaths = encodedImage;
-        _previewBytes = imageBytes;
       });
       widget.onImageChanged?.call(_imagePaths);
     } catch (e) {
@@ -325,7 +351,6 @@ class _ImageUploaderScreenState extends State<ImageUploaderScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final hasImages = _imagePaths.isNotEmpty;
-    final primaryPreview = _previewBytes;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -364,12 +389,18 @@ class _ImageUploaderScreenState extends State<ImageUploaderScreen> {
                         borderRadius: BorderRadius.circular(22),
                         border: Border.all(color: colorScheme.outlineVariant),
                       ),
-                      child: primaryPreview != null && primaryPreview.isNotEmpty
+                      child: hasImages
                           ? ClipRRect(
                               borderRadius: BorderRadius.circular(21),
-                              child: Image.memory(
-                                primaryPreview,
-                                fit: BoxFit.contain,
+                              child: buildInventoryImage(
+                                source: _imagePaths,
+                                width: previewSize,
+                                height: previewSize,
+                                placeholder: Icon(
+                                  Icons.image_outlined,
+                                  size: 72,
+                                  color: colorScheme.outline,
+                                ),
                               ),
                             )
                           : Icon(
@@ -393,6 +424,67 @@ class _ImageUploaderScreenState extends State<ImageUploaderScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+class BookResult extends StatelessWidget {
+  final Book book;
+
+  const BookResult({super.key, required this.book});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () {
+        return Navigator.of(context).pop(book);
+      },
+      child: Row(
+        children: [
+          SizedBox(
+            width: 48,
+            height: 72,
+            child: buildInventoryImage(
+              source: book.img,
+              width: 48,
+              height: 72,
+              fit: BoxFit.cover,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(book.name, overflow: TextOverflow.ellipsis),
+                Text(book.author, overflow: TextOverflow.ellipsis),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class PickBook extends StatelessWidget {
+  final List<Book> books;
+
+  const PickBook({super.key, required this.books});
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      content: SizedBox(
+        width: double.maxFinite,
+        child: ListView.builder(
+          shrinkWrap: true,
+          itemCount: books.length,
+          itemBuilder: (context, index) {
+            return BookResult(book: books[index]);
+          },
+        ),
+      ),
     );
   }
 }
